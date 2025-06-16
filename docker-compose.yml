@@ -72,20 +72,7 @@ services:
     networks:
       - backend
 
-  ardm:
-    container_name: ${PROJECT_NAME}-redis-manager
-    image: qishibo/another-redis-desktop-manager:latest
-    env_file:
-      - .env
-    environment:
-      - ARDM_PORT=${ARDM_PORT}
-    ports:
-      - "${ARDM_PORT}:8081"
-    depends_on:
-      - redis
-    networks:
-      - backend
-      - frontend
+
 
   pgadmin:
     container_name: ${PROJECT_NAME}-pgadmin
@@ -162,8 +149,22 @@ services:
     networks:
       - backend
 
+  redisinsight:
+    container_name: redisinsight
+    image: redis/redisinsight:latest
+    ports:
+      - "${REDISINSIGHT_PORT}:5540"
+    volumes:
+      - redisinsight:/data
+    depends_on:
+      - redis
+    networks:
+      - backend
+      - frontend
+
 volumes:
   postgres_data:
+  redisinsight:
 
 networks:
   frontend:
