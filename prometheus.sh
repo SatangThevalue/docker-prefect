@@ -12,14 +12,19 @@ else
   exit 1
 fi
 
+# Set default values if not set in .env
+PREFECT_API_HOST=${PREFECT_API_HOST:-prefect-api}
+PREFECT_API_PORT=${PREFECT_API_PORT:-4200}
+
 cat > prometheus.yml <<EOF
 global:
-  scrape_interval: 10s
+  scrape_interval: 15s # Scrape ทุก 15 วินาที (สามารถปรับได้)
 
 scrape_configs:
-  - job_name: 'prefect-api'
+  - job_name: 'prefect-api' # ชื่อ job ที่จะแสดงใน Prometheus
+    metrics_path: '/metrics' # Path ที่ Prefect API expose metrics (โดยทั่วไปคือ /metrics)
     static_configs:
-      - targets: ['${PREFECT_API_HOST:-prefect-api}:${PREFECT_API_PORT:-4200}']
+      - targets: ['${PREFECT_API_HOST}:${PREFECT_API_PORT}'] # ใช้ค่าจาก .env หรือค่า default
   - job_name: 'postgres'
     static_configs:
       - targets: ['${POSTGRES_HOST:-postgres-db}:${POSTGRES_PORT:-5432}']
