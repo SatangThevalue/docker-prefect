@@ -37,7 +37,7 @@ services:
     image: prefecthq/prefect:latest
     depends_on: [migrate, postgres, redis]
     deploy:
-      replicas: 3
+      replicas: 1
     env_file:
       - .env
     command: prefect server start --host 0.0.0.0 --no-services
