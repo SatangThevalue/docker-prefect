@@ -14,6 +14,44 @@
 
 ---
 
+## System Architecture Diagram (Mermaid)
+
+```mermaid
+graph TD
+  subgraph Backend Network
+    postgres_db[(PostgreSQL)]
+    redis_server[(Redis)]
+    prefect_migrate[(Prefect Migrate)]
+    prefect_background[(Prefect Background)]
+    prefect_api[(Prefect API)]
+    pgbackups[(Postgres Backup)]
+  end
+
+  subgraph Frontend Network
+    prefect_api
+    pgadmin[(pgAdmin)]
+    ardm[(ARDM)]
+  end
+
+  pgadmin -- Connects to --> postgres_db
+  ardm -- Connects to --> redis_server
+  prefect_api -- Connects to --> postgres_db
+  prefect_api -- Connects to --> redis_server
+  prefect_background -- Connects to --> postgres_db
+  prefect_background -- Connects to --> redis_server
+  prefect_migrate -- Connects to --> postgres_db
+  pgbackups -- Connects to --> postgres_db
+
+  classDef frontend fill:#e0f7fa,stroke:#00796b;
+  classDef backend fill:#f3e5f5,stroke:#6a1b9a;
+  class prefect_api,pgadmin,ardm frontend;
+  class postgres_db,redis_server,prefect_migrate,prefect_background,pgbackups backend;
+```
+
+---
+
+---
+
 ## Service Details
 
 - **postgres**: ฐานข้อมูล PostgreSQL สำหรับ Prefect
@@ -179,41 +217,26 @@ PREFECT_LOGGING_LEVEL=DEBUG python my_script.py
 
 ---
 
-## System Architecture Diagram (Mermaid)
+## หมายเหตุเกี่ยวกับ PostgreSQL สำหรับ Prefect
 
-```mermaid
-graph TD
-  subgraph Backend Network
-    postgres_db[(PostgreSQL)]
-    redis_server[(Redis)]
-    prefect_migrate[(Prefect Migrate)]
-    prefect_background[(Prefect Background)]
-    prefect_api[(Prefect API)]
-    pgbackups[(Postgres Backup)]
-  end
+**PostgreSQL:** เหมาะสำหรับ production, รองรับ high availability และ multi-server deployments แต่ต้องมีการตั้งค่าเพิ่มเติม Prefect ต้องใช้ extension `pg_trgm` ดังนั้นต้องติดตั้งและเปิดใช้งาน extension นี้ในฐานข้อมูลด้วย
 
-  subgraph Frontend Network
-    prefect_api
-    pgadmin[(pgAdmin)]
-    ardm[(ARDM)]
-  end
+### วิธีติดตั้งและเปิดใช้งาน pg_trgm extension
 
-  pgadmin -- Connects to --> postgres_db
-  ardm -- Connects to --> redis_server
-  prefect_api -- Connects to --> postgres_db
-  prefect_api -- Connects to --> redis_server
-  prefect_background -- Connects to --> postgres_db
-  prefect_background -- Connects to --> redis_server
-  prefect_migrate -- Connects to --> postgres_db
-  pgbackups -- Connects to --> postgres_db
+1. เข้าสู่ container ของ postgres:
+   ```sh
+   docker exec -it ${PROJECT_NAME}-postgres-db bash
+   ```
+2. เข้าสู่ psql shell:
+   ```sh
+   psql -U $POSTGRES_USER -d $POSTGRES_DB
+   ```
+3. ติดตั้ง extension:
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS pg_trgm;
+   ```
 
-  classDef frontend fill:#e0f7fa,stroke:#00796b;
-  classDef backend fill:#f3e5f5,stroke:#6a1b9a;
-  class prefect_api,pgadmin,ardm frontend;
-  class postgres_db,redis_server,prefect_migrate,prefect_background,pgbackups backend;
-```
-
----
+> หากไม่ติดตั้ง extension นี้ Prefect อาจทำงานได้ไม่สมบูรณ์ในบางฟีเจอร์ เช่น การค้นหา
 
 ## License
 MIT
