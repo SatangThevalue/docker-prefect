@@ -1,5 +1,21 @@
 # Prefect Orchestration Stack: Production-Ready with Monitoring
 
+## สารบัญ
+1. [Overview](#overview)
+2. [System Architecture Diagram (Mermaid)](#system-architecture-diagram-mermaid)
+3. [สรุปพอร์ตที่ใช้ในระบบ](#สรุปพอร์ตที่ใช้ในระบบ)
+4. [.env Configuration](#env-configuration)
+5. [Key Features & Best Practices](#key-features--best-practices)
+6. [Monitoring](#monitoring)
+7. [How to Use](#how-to-use)
+8. [Health Check & Load Balancer (nginx.conf)](#health-check--load-balancer-nginxconf)
+9. [PostgreSQL: Production Note](#postgresql-production-note)
+10. [Monitoring Example (prometheus.yml)](#monitoring-example-prometheusyml)
+11. [การชี้ Prefect self-hosted server ไปยังเซิร์ฟเวอร์ของคุณเอง](#การชี้-prefect-self-hosted-server-ไปยังเซิร์ฟเวอร์ของคุณเอง)
+12. [คำแนะนำเพิ่มเติม](#คำแนะนำเพิ่มเติม)
+13. [License](#license)
+14. [แหล่งอ้างอิง](#แหล่งอ้างอิง)
+
 ## Overview
 
 ระบบนี้เป็น Prefect orchestration stack ที่พร้อมใช้งาน production ด้วย Docker Compose ประกอบด้วยบริการหลัก:
@@ -243,3 +259,87 @@ scrape_configs:
 
 ## License
 MIT
+
+---
+
+## การชี้ Prefect self-hosted server ไปยังเซิร์ฟเวอร์ของคุณเอง
+
+การชี้ Prefect self-hosted server ไปยังเซิร์ฟเวอร์ของเราเองนั้นมีขั้นตอนหลักๆ คือการตั้งค่า `PREFECT_API_URL` ให้ชี้ไปยังที่อยู่ของ Prefect Server ที่คุณติดตั้งไว้ โดยมีวิธีการต่างๆ ดังนี้:
+
+### 1. ติดตั้ง Prefect Server บนเซิร์ฟเวอร์ของคุณ
+
+ก่อนอื่น คุณต้องติดตั้ง Prefect Server บนเซิร์ฟเวอร์ที่คุณต้องการให้เป็นศูนย์กลางในการจัดการเวิร์คโฟลว์ของคุณ Prefect มีหลายวิธีในการติดตั้ง เช่น:
+- **ผ่าน CLI**: คุณสามารถรัน Prefect Server ได้โดยตรงจาก Command Line Interface (CLI)
+- **ผ่าน Docker**: การใช้ Docker เป็นวิธีที่นิยมและแนะนำสำหรับการตั้งค่า production เนื่องจากช่วยให้การจัดการ Dependency และ Environment เป็นไปได้ง่ายขึ้น
+
+ตัวอย่างการรัน Prefect Server ด้วย Docker:
+```sh
+docker run -p 4200:4200 -d --rm prefecthq/prefect:3-latest -- prefect server start --host 0.0.0.0
+```
+คำสั่งนี้จะรัน Prefect Server บนพอร์ต 4200 และให้ Prefect Server ฟังการเชื่อมต่อจากทุก IP (0.0.0.0) ซึ่งสำคัญมากเมื่อรันใน Docker เพื่อให้สามารถเข้าถึงได้จากภายนอกคอนเทนเนอร์
+
+### 2. กำหนด PREFECT_API_URL เพื่อชี้ไปยังเซิร์ฟเวอร์ของคุณ
+
+เมื่อ Prefect Server ของคุณทำงานอยู่ คุณต้องกำหนดค่า `PREFECT_API_URL` บนเครื่องที่คุณต้องการรัน Prefect Flows (เช่น เครื่องที่คุณพัฒนาโค้ด หรือเครื่องที่รัน Prefect Worker/Agent) เพื่อให้ Prefect Client, Worker, หรือ Agent รู้ว่าจะเชื่อมต่อไปยัง Prefect Server ที่ใด
+
+คุณสามารถตั้งค่า `PREFECT_API_URL` ได้หลายวิธี:
+
+#### ผ่าน Command Line (สำหรับ Active Profile):
+```sh
+prefect config set PREFECT_API_URL="http://your-server-hostname-or-ip:4200/api"
+```
+แทนที่ `your-server-hostname-or-ip` ด้วย IP Address หรือชื่อโฮสต์ของเซิร์ฟเวอร์ที่คุณติดตั้ง Prefect Server และ 4200 คือพอร์ตที่คุณเปิดให้ Prefect Server ฟัง (ค่าเริ่มต้นคือ 4200)
+
+#### ผ่าน Environment Variable:
+```sh
+export PREFECT_API_URL="http://your-server-hostname-or-ip:4200/api"
+```
+
+#### ผ่านไฟล์ .env หรือ prefect.toml (สำหรับโปรเจกต์):
+ในไฟล์ `.env`:
+```env
+PREFECT_API_URL="http://your-server-hostname-or-ip:4200/api"
+```
+ในไฟล์ `prefect.toml`:
+```toml
+[api]
+url = "http://your-server-hostname-or-ip:4200/api"
+```
+
+### 3. การพิจารณาเพิ่มเติม
+
+- **การตั้งค่าฐานข้อมูล (Database Configuration):** โดยค่าเริ่มต้น Prefect จะใช้ SQLite เป็นฐานข้อมูล ซึ่งเหมาะสำหรับการใช้งานส่วนบุคคลหรือการพัฒนา แต่สำหรับ production คุณควรพิจารณาใช้ฐานข้อมูลภายนอก เช่น PostgreSQL เพื่อความทนทานและความสามารถในการขยายขนาด
+
+  คุณสามารถตั้งค่า `PREFECT_API_DATABASE_CONNECTION_URL` ได้เช่นกัน:
+  ```sh
+  prefect config set PREFECT_API_DATABASE_CONNECTION_URL="postgresql+asyncpg://user:password@host:port/prefect"
+  ```
+
+- **Prefect Worker แทน Agent:** Prefect แนะนำให้ใช้ Prefect Worker แทน Agent ในเวอร์ชันล่าสุด Worker มีความยืดหยุ่นและมีประสิทธิภาพมากกว่า
+
+- **Firewall และ Network:** ตรวจสอบให้แน่ใจว่า Firewall บนเซิร์ฟเวอร์ของคุณอนุญาตให้มีการเชื่อมต่อขาเข้าบนพอร์ตที่ Prefect Server ใช้งานอยู่ (เช่น 4200) และเครือข่ายของคุณอนุญาตให้เครื่อง Client/Worker/Agent สามารถเข้าถึงเซิร์ฟเวอร์ Prefect ได้
+
+- **HTTPS/SSL:** สำหรับ Production Environment ควรตั้งค่า Prefect Server ให้ทำงานบน HTTPS โดยการใช้ Reverse Proxy (เช่น Nginx หรือ Apache) และกำหนดค่า SSL certificates เพื่อความปลอดภัย
+
+- **การจัดการผู้ใช้และการรับรองความถูกต้อง (User Management and Authentication):** สำหรับ Self-hosted Prefect ในเวอร์ชัน Community Edition การจัดการผู้ใช้อาจมีข้อจำกัด Prefect มีคุณสมบัติ Basic Authentication ที่สามารถตั้งค่าได้สำหรับเซิร์ฟเวอร์ที่ติดตั้งด้วยตัวเอง
+
+  - บนเซิร์ฟเวอร์: `prefect config set server.api.auth_string="admin:your_password"`
+  - บน Client/Worker: `prefect config set api.auth_string="admin:your_password"`
+
+- **Profiles:** Prefect มีระบบ Profiles ที่ช่วยให้คุณจัดการการตั้งค่าต่างๆ ได้ คุณสามารถสร้าง Profile ใหม่สำหรับการเชื่อมต่อไปยัง Prefect Server ของคุณได้
+
+---
+
+## แหล่งอ้างอิง
+- https://docs.prefect.io/latest/
+- https://github.com/PrefectHQ/prefect
+- https://hub.docker.com/r/prefecthq/prefect
+- https://hub.docker.com/_/postgres
+- https://hub.docker.com/_/redis
+- https://hub.docker.com/r/dpage/pgadmin4
+- https://hub.docker.com/r/qishibo/another-redis-desktop-manager
+- https://hub.docker.com/r/prom/prometheus
+- https://hub.docker.com/r/grafana/grafana
+- https://prometheus.io/docs/introduction/overview/
+- https://grafana.com/docs/grafana/latest/
+- https://www.nginx.com/resources/wiki/
