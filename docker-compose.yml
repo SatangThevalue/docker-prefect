@@ -1,0 +1,132 @@
+version: '3.8'
+services:
+  postgres:
+    container_name: ${PROJECT_NAME}-postgres-db
+    image: postgres:15
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+
+  redis:
+    container_name: ${PROJECT_NAME}-redis-server
+    image: redis:7
+    networks:
+      - backend
+
+  migrate:
+    container_name: ${PROJECT_NAME}-prefect-migrate
+    image: prefecthq/prefect:latest
+    depends_on: [postgres]
+    env_file:
+      - .env
+    command: prefect server database upgrade -y
+    environment:
+      PREFECT_API_DATABASE_CONNECTION_URL: ${PREFECT_API_DATABASE_CONNECTION_URL}
+    networks:
+      - backend
+
+  prefect-api:
+    container_name: ${PROJECT_NAME}-prefect-api
+    image: prefecthq/prefect:latest
+    depends_on: [migrate, postgres, redis]
+    deploy:
+      replicas: 3
+    env_file:
+      - .env
+    command: prefect server start --host 0.0.0.0 --no-services
+    environment:
+      PREFECT_API_DATABASE_CONNECTION_URL: ${PREFECT_API_DATABASE_CONNECTION_URL}
+      PREFECT_API_DATABASE_MIGRATE_ON_START: "${PREFECT_API_DATABASE_MIGRATE_ON_START}"
+      PREFECT_MESSAGING_BROKER: ${PREFECT_MESSAGING_BROKER}
+      PREFECT_MESSAGING_CACHE: ${PREFECT_MESSAGING_CACHE}
+      PREFECT_REDIS_MESSAGING_HOST: ${PREFECT_REDIS_MESSAGING_HOST}
+      PREFECT_REDIS_MESSAGING_PORT: "${PREFECT_REDIS_MESSAGING_PORT}"
+    ports:
+      - "4200-4202:4200"
+    networks:
+      - backend
+      - frontend
+
+  prefect-background:
+    container_name: ${PROJECT_NAME}-prefect-background
+    image: prefecthq/prefect:latest
+    depends_on: [migrate, postgres, redis]
+    env_file:
+      - .env
+    command: prefect server services start
+    environment:
+      PREFECT_API_DATABASE_CONNECTION_URL: ${PREFECT_API_DATABASE_CONNECTION_URL}
+      PREFECT_API_DATABASE_MIGRATE_ON_START: "${PREFECT_API_DATABASE_MIGRATE_ON_START}"
+      PREFECT_MESSAGING_BROKER: ${PREFECT_MESSAGING_BROKER}
+      PREFECT_MESSAGING_CACHE: ${PREFECT_MESSAGING_CACHE}
+      PREFECT_REDIS_MESSAGING_HOST: ${PREFECT_REDIS_MESSAGING_HOST}
+      PREFECT_REDIS_MESSAGING_PORT: "${PREFECT_REDIS_MESSAGING_PORT}"
+    networks:
+      - backend
+
+  ardm:
+    container_name: ${PROJECT_NAME}-redis-manager
+    image: qishibo/another-redis-desktop-manager:latest
+    env_file:
+      - .env
+    environment:
+      - ARDM_PORT=${ARDM_PORT}
+    ports:
+      - "${ARDM_PORT}:8081"
+    depends_on:
+      - redis
+    networks:
+      - backend
+      - frontend
+
+  pgadmin:
+    container_name: ${PROJECT_NAME}-pgadmin
+    image: dpage/pgadmin4:latest
+    env_file:
+      - .env
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    ports:
+      - "${PGADMIN_PORT}:80"
+    depends_on:
+      - postgres
+    networks:
+      - backend
+      - frontend
+
+  pgbackups:
+    image: prodrigestivill/postgres-backup-local:latest
+    container_name: ${PROJECT_NAME}-postgres-backup
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres-db
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SCHEDULE: "0 3 * * *"
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 4
+      BACKUP_KEEP_MONTHS: 6
+      BACKUP_DIR: /backups
+    volumes:
+      - ./postgres_backups:/backups
+    depends_on:
+      - postgres
+    networks:
+      - backend
+
+volumes:
+  postgres_data:
+
+networks:
+  frontend:
+  backend:
