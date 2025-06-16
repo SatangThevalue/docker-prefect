@@ -1,16 +1,17 @@
-# Prefect Orchestration Stack with PostgreSQL, Redis, pgAdmin, ARDM, and Automated Backups
+# Prefect Orchestration Stack: Production-Ready with Monitoring
 
 ## Overview
-โปรเจคนี้เป็นระบบ Orchestration สำหรับ Prefect ที่พร้อมใช้งานในสภาพแวดล้อม production ด้วย Docker Compose ประกอบด้วยบริการหลักดังนี้:
 
-- **Prefect Server**: ระบบ workflow orchestration สำหรับ data pipeline และ automation
-- **PostgreSQL**: ฐานข้อมูลหลักสำหรับ Prefect
-- **Redis**: ใช้สำหรับ messaging และ caching ของ Prefect
-- **pgAdmin**: UI สำหรับจัดการและดูแล PostgreSQL
-- **Another Redis Desktop Manager (ARDM)**: UI สำหรับจัดการ Redis
-- **Automated PostgreSQL Backups**: สำรองข้อมูลอัตโนมัติทุกวัน
+ระบบนี้เป็น Prefect orchestration stack ที่พร้อมใช้งาน production ด้วย Docker Compose ประกอบด้วยบริการหลัก:
+- **Prefect Server** (API, Background, Migrate)
+- **PostgreSQL** (พร้อมสำรองข้อมูลและ extension pg_trgm)
+- **Redis**
+- **pgAdmin** (UI จัดการ PostgreSQL)
+- **ARDM** (UI จัดการ Redis)
+- **Nginx** (Load Balancer + Health Check)
+- **Prometheus & Grafana** (Monitoring)
 
-ระบบนี้แยก network เป็น frontend/backend เพื่อความปลอดภัยและการจัดการที่ดี
+ระบบแยก network frontend/backend เพื่อความปลอดภัยและรองรับ multi-server deployment
 
 ---
 
@@ -23,20 +24,37 @@ graph TD
     redis_server[(Redis)]
     prefect_migrate[(Prefect Migrate)]
     prefect_background[(Prefect Background)]
-    prefect_api[(Prefect API)]
+    prefect_api1[(Prefect API 1)]
+    prefect_api2[(Prefect API 2)]
+    prefect_api3[(Prefect API 3)]
     pgbackups[(Postgres Backup)]
+    prometheus[(Prometheus)]
+    grafana[(Grafana)]
   end
 
   subgraph Frontend Network
-    prefect_api
+    nginx[(Nginx LB)]
     pgadmin[(pgAdmin)]
     ardm[(ARDM)]
   end
 
+  nginx -- LB --> prefect_api1
+  nginx -- LB --> prefect_api2
+  nginx -- LB --> prefect_api3
   pgadmin -- Connects to --> postgres_db
   ardm -- Connects to --> redis_server
-  prefect_api -- Connects to --> postgres_db
-  prefect_api -- Connects to --> redis_server
+  prometheus -- Scrape --> prefect_api1
+  prometheus -- Scrape --> prefect_api2
+  prometheus -- Scrape --> prefect_api3
+  prometheus -- Scrape --> postgres_db
+  prometheus -- Scrape --> redis_server
+  grafana -- Dashboard --> prometheus
+  prefect_api1 -- Connects to --> postgres_db
+  prefect_api1 -- Connects to --> redis_server
+  prefect_api2 -- Connects to --> postgres_db
+  prefect_api2 -- Connects to --> redis_server
+  prefect_api3 -- Connects to --> postgres_db
+  prefect_api3 -- Connects to --> redis_server
   prefect_background -- Connects to --> postgres_db
   prefect_background -- Connects to --> redis_server
   prefect_migrate -- Connects to --> postgres_db
@@ -44,32 +62,15 @@ graph TD
 
   classDef frontend fill:#e0f7fa,stroke:#00796b;
   classDef backend fill:#f3e5f5,stroke:#6a1b9a;
-  class prefect_api,pgadmin,ardm frontend;
-  class postgres_db,redis_server,prefect_migrate,prefect_background,pgbackups backend;
+  class nginx,pgadmin,ardm frontend;
+  class postgres_db,redis_server,prefect_migrate,prefect_background,prefect_api1,prefect_api2,prefect_api3,pgbackups,prometheus,grafana backend;
 ```
-
----
-
----
-
-## Service Details
-
-- **postgres**: ฐานข้อมูล PostgreSQL สำหรับ Prefect
-- **redis**: Redis สำหรับ messaging/caching
-- **migrate**: รัน database migration อัตโนมัติให้ Prefect
-- **prefect-api**: API และ UI ของ Prefect (scale ได้)
-- **prefect-background**: Background services ของ Prefect
-- **ardm**: Another Redis Desktop Manager สำหรับดูแล Redis
-- **pgadmin**: pgAdmin สำหรับดูแล PostgreSQL
-- **pgbackups**: สำรองข้อมูล PostgreSQL อัตโนมัติทุกวัน
 
 ---
 
 ## .env Configuration
 
-ไฟล์ `.env` ใช้สำหรับตั้งค่าตัวแปรสำคัญต่าง ๆ ของระบบ เช่น
-
-```
+```env
 # Project name for container prefix
 PROJECT_NAME=prefectstack
 
@@ -92,7 +93,6 @@ PREFECT_MESSAGING_CACHE=prefect_redis.messaging
 PREFECT_REDIS_MESSAGING_HOST=redis
 # Redis port for Prefect messaging
 PREFECT_REDIS_MESSAGING_PORT=6379
-
 # Port for Another Redis Desktop Manager (ARDM) web UI
 ARDM_PORT=8081
 
@@ -102,15 +102,38 @@ PGADMIN_DEFAULT_EMAIL=admin@admin.com
 PGADMIN_DEFAULT_PASSWORD=admin123
 # Port for pgAdmin web UI
 PGADMIN_PORT=8888
-```
 
-**หมายเหตุ:**
-- สามารถเปลี่ยนชื่อโปรเจคได้ที่ `PROJECT_NAME` เพื่อให้ container_name ทุกตัวมี prefix ตามโปรเจค
-- สามารถเปลี่ยนรหัสผ่าน, อีเมล, และพอร์ตต่าง ๆ ได้ตามต้องการ
+# Grafana admin user
+GRAFANA_ADMIN_USER=admin
+# Grafana admin password
+GRAFANA_ADMIN_PASSWORD=admin123
+```
 
 ---
 
-## Usage
+## Key Features & Best Practices
+
+- รองรับ multi-server deployment (scale API ได้)
+- ใช้ Nginx เป็น Load Balancer พร้อม health check `/api/health`
+- PostgreSQL ติดตั้ง extension `pg_trgm` อัตโนมัติ (สำหรับ Prefect)
+- สำรองข้อมูล Postgres อัตโนมัติ (pgbackups)
+- Monitoring ครบวงจรด้วย Prometheus + Grafana
+- แยก network frontend/backend
+- ตั้งค่าทุกอย่างผ่าน .env
+
+---
+
+## Monitoring
+- **Database connections**: เฝ้าระวัง connection pool exhaustion
+- **Redis memory**: ตรวจสอบ memory queue
+- **API response times**: ติดตาม latency endpoint ต่าง ๆ
+- **Background service lag**: เฝ้าดูเวลาระหว่าง event creation และ processing
+- **Prometheus**: เก็บ metrics จาก Prefect, Postgres, Redis
+- **Grafana**: Dashboard สำหรับดูสถานะระบบ
+
+---
+
+## How to Use
 
 1. แก้ไขไฟล์ `.env` ให้เหมาะสมกับสภาพแวดล้อมของคุณ
 2. สั่งรันด้วยคำสั่ง:
@@ -121,122 +144,102 @@ PGADMIN_PORT=8888
    - Prefect UI: http://localhost:4200
    - pgAdmin: http://localhost:8888
    - ARDM: http://localhost:8081
-4. ไฟล์ backup ของ PostgreSQL จะถูกเก็บไว้ที่โฟลเดอร์ `./postgres_backups` ในเครื่องของคุณ
+   - Prometheus: http://localhost:9090
+   - Grafana: http://localhost:3000
+4. สำรองข้อมูล Postgres จะอยู่ใน `./postgres_backups`
+5. หากต้องการ scale Prefect API ให้เพิ่ม replicas ใน docker-compose และเพิ่ม server ใน nginx.conf
 
 ---
 
-## Network Separation
-- **backend**: สำหรับ service ภายใน เช่น postgres, redis, prefect core
-- **frontend**: สำหรับ UI tools เช่น pgAdmin, ARDM, prefect-api
+## Health Check & Load Balancer (nginx.conf)
 
----
+- Health endpoint: `/api/health` (HTTP 200, JSON `{"status": "healthy"}`)
+- ตัวอย่าง nginx.conf:
 
-## Security & Scaling
-- สามารถปรับจำนวน replica ของ prefect-api ได้ใน docker-compose
-- สามารถเปลี่ยนรหัสผ่านและพอร์ตเพื่อความปลอดภัย
-- ข้อมูลสำรอง postgres จะถูกเก็บไว้ในเครื่องและสามารถนำไปกู้คืนได้ง่าย
+```nginx
+upstream prefect_api {
+    least_conn;
+    server ${PROJECT_NAME}-prefect-api:4200 max_fails=3 fail_timeout=30s;
+    # เพิ่ม server เพิ่มเติมหาก scale ด้วยชื่อ container จริง
+}
 
----
-
-## How to Manage Settings
-
-### View current configuration
-To view all available settings and their active values from the command line, run:
-
-```sh
-prefect config view --show-defaults
-```
-These settings are type-validated and you may verify your setup at any time with:
-
-```sh
-prefect config validate
-```
-
-### Configure settings for the active profile
-To update a setting for the active profile, run:
-
-```sh
-prefect config set <setting>=<value>
-```
-For example, to set the `PREFECT_API_URL` setting to `http://127.0.0.1:4200/api`, run:
-
-```sh
-prefect config set PREFECT_API_URL=http://127.0.0.1:4200/api
-```
-To restore the default value for a setting, run:
-
-```sh
-prefect config unset <setting>
-```
-For example, to restore the default value for the `PREFECT_API_URL` setting, run:
-
-```sh
-prefect config unset PREFECT_API_URL
-```
-
-### Create a new profile
-To create a new profile, run:
-
-```sh
-prefect profile create <profile>
-```
-To switch to a new profile, run:
-
-```sh
-prefect profile use <profile>
-```
-
-### Configure settings for a project
-To configure settings for a project, create a `prefect.toml` or `.env` file in the project directory and add the settings with the values you want to use.
-
-For example, to configure the `PREFECT_API_URL` setting to `http://127.0.0.1:4200/api`, create a `.env` file with the following content:
-
-```env
-PREFECT_API_URL=http://127.0.0.1:4200/api
-```
-To configure the `PREFECT_API_URL` setting to `http://127.0.0.1:4200/api` in a `prefect.toml` file, create a `prefect.toml` file with the following content:
-
-```toml
-api.url = "http://127.0.0.1:4200/api"
-```
-Refer to the [setting concept guide](https://docs.prefect.io/latest/concepts/settings/) for more information on how to configure settings and the [settings reference guide](https://docs.prefect.io/latest/reference/settings/) for more information on the available settings.
-
-### Configure temporary settings for a process
-To configure temporary settings for a process, set an environment variable with the name matching the setting you want to configure.
-
-For example, to configure the `PREFECT_API_URL` setting to `http://127.0.0.1:4200/api` for a process, set the `PREFECT_API_URL` environment variable to `http://127.0.0.1:4200/api`:
-
-```sh
-export PREFECT_API_URL=http://127.0.0.1:4200/api
-```
-You can use this to run a command with the temporary setting:
-
-```sh
-PREFECT_LOGGING_LEVEL=DEBUG python my_script.py
+server {
+    listen 4200;
+    
+    location /api/health {
+        proxy_pass http://prefect_api;
+        proxy_connect_timeout 1s;
+        proxy_read_timeout 1s;
+    }
+    
+    location / {
+        proxy_pass http://prefect_api;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
 ```
 
 ---
 
-## หมายเหตุเกี่ยวกับ PostgreSQL สำหรับ Prefect
+## PostgreSQL: Production Note
+- เหมาะสำหรับ production, high availability, multi-server deployments
+- Prefect ต้องใช้ extension `pg_trgm` (ติดตั้งอัตโนมัติด้วย init-pg_trgm.sh)
+- หากใช้ฐานข้อมูลเดิม ให้รันสคริปต์นี้ใน container postgres:
 
-**PostgreSQL:** เหมาะสำหรับ production, รองรับ high availability และ multi-server deployments แต่ต้องมีการตั้งค่าเพิ่มเติม Prefect ต้องใช้ extension `pg_trgm` ดังนั้นต้องติดตั้งและเปิดใช้งาน extension นี้ในฐานข้อมูลด้วย
+```sh
+docker exec -it ${PROJECT_NAME}-postgres-db bash
+psql -U $POSTGRES_USER -d $POSTGRES_DB -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+```
 
-### วิธีติดตั้งและเปิดใช้งาน pg_trgm extension
+---
 
-1. เข้าสู่ container ของ postgres:
-   ```sh
-   docker exec -it ${PROJECT_NAME}-postgres-db bash
-   ```
-2. เข้าสู่ psql shell:
-   ```sh
-   psql -U $POSTGRES_USER -d $POSTGRES_DB
-   ```
-3. ติดตั้ง extension:
-   ```sql
-   CREATE EXTENSION IF NOT EXISTS pg_trgm;
-   ```
+## Monitoring Example (prometheus.yml)
 
-> หากไม่ติดตั้ง extension นี้ Prefect อาจทำงานได้ไม่สมบูรณ์ในบางฟีเจอร์ เช่น การค้นหา
+```yaml
+global:
+  scrape_interval: 10s
+
+scrape_configs:
+  - job_name: 'prefect-api'
+    static_configs:
+      - targets: ['${PROJECT_NAME}-prefect-api:4200']
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['${PROJECT_NAME}-postgres-db:5432']
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['${PROJECT_NAME}-redis-server:6379']
+```
+
+---
+
+## สรุปพอร์ตที่ใช้ในระบบ
+
+| Service                | Port (Host) | Port (Container) | Network    | Description                        |
+|------------------------|-------------|------------------|------------|------------------------------------|
+| Nginx (Load Balancer)  | 4200        | 4200             | frontend   | Prefect UI/REST (ผ่าน LB)          |
+| Prefect API            | 4200-4202   | 4200             | backend    | Prefect API (replica)              |
+| pgAdmin                | 8888        | 80               | frontend   | PostgreSQL Web UI                  |
+| ARDM (Redis Manager)   | 8081        | 8081             | frontend   | Redis Web UI                       |
+| Prometheus             | 9090        | 9090             | backend    | Monitoring                         |
+| Grafana                | 3000        | 3000             | backend    | Monitoring Dashboard               |
+| PostgreSQL             | (internal)  | 5432             | backend    | Database (ไม่ expose ออก host)     |
+| Redis                  | (internal)  | 6379             | backend    | Message Broker (ไม่ expose ออก host)|
+
+> หมายเหตุ: สามารถเปลี่ยนพอร์ตฝั่ง host ได้ในไฟล์ .env หรือ docker-compose.yml ตามต้องการ
+
+---
+
+## คำแนะนำเพิ่มเติม
+- เริ่มต้น Prefect API 2-3 instance และ scale ตาม load จริง
+- ใช้ connection pooling กับฐานข้อมูล
+- ติดตั้ง monitoring ก่อน scale เพิ่มเติม
+- ทดสอบ failover scenario เป็นประจำ
+
+---
 
 ## License
 MIT
