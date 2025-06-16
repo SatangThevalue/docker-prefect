@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script for setting up Docker, Docker Compose, and Docker user group on Ubuntu
+# Script for setting up Docker, Docker Compose, Docker user group, and mkcert on Ubuntu
 # Usage: sudo bash setup_docker.sh
 
 set -e
@@ -13,7 +13,8 @@ sudo apt-get install -y \
     ca-certificates \
     curl \
     gnupg \
-    lsb-release
+    lsb-release \
+    libnss3-tools
 
 # Add Docker’s official GPG key
 sudo install -m 0755 -d /etc/apt/keyrings
@@ -38,6 +39,31 @@ sudo systemctl start docker
 # Add current user to docker group
 sudo usermod -aG docker $USER
 
+# Install mkcert
+if ! command -v mkcert &> /dev/null; then
+  echo "Installing mkcert..."
+  sudo apt-get install -y wget
+  wget -O mkcert https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-linux-amd64
+  chmod +x mkcert
+  sudo mv mkcert /usr/local/bin/
+fi
+
+# Create local CA if not exists
+if [ ! -f "$HOME/.local/share/mkcert/rootCA.pem" ]; then
+  mkcert -install
+fi
+
 # Print info
-echo "\nDocker and Docker Compose installed successfully."
+echo "\nDocker, Docker Compose, and mkcert installed successfully."
 echo "User $USER added to docker group. Please log out and log in again to use Docker without sudo."
+echo "Use mkcert to generate SSL certificates for local development."
+
+# Generate SSL certificate for domain from .env (PREFECT_DOMAIN or fallback to localhost)
+CERT_DIR="$(pwd)/certs"
+DOMAIN=$(grep '^PREFECT_DOMAIN=' .env | cut -d '=' -f2 | tr -d '"')
+if [ -z "$DOMAIN" ]; then
+  DOMAIN=localhost
+fi
+mkdir -p "$CERT_DIR"
+mkcert -cert-file "$CERT_DIR/fullchain.pem" -key-file "$CERT_DIR/privkey.pem" "$DOMAIN"
+echo "\nSSL certificate generated for domain: $DOMAIN (output in ./certs)"
