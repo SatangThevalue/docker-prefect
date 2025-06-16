@@ -125,6 +125,18 @@ services:
     networks:
       - backend
 
+  nginx:
+    image: nginx:alpine
+    container_name: ${PROJECT_NAME}-nginx
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "4200:4200"
+    depends_on:
+      - prefect-api
+    networks:
+      - frontend
+
 volumes:
   postgres_data:
 
