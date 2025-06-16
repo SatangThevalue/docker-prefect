@@ -179,5 +179,41 @@ PREFECT_LOGGING_LEVEL=DEBUG python my_script.py
 
 ---
 
+## System Architecture Diagram (Mermaid)
+
+```mermaid
+graph TD
+  subgraph Backend Network
+    postgres_db[(PostgreSQL)]
+    redis_server[(Redis)]
+    prefect_migrate[(Prefect Migrate)]
+    prefect_background[(Prefect Background)]
+    prefect_api[(Prefect API)]
+    pgbackups[(Postgres Backup)]
+  end
+
+  subgraph Frontend Network
+    prefect_api
+    pgadmin[(pgAdmin)]
+    ardm[(ARDM)]
+  end
+
+  pgadmin -- Connects to --> postgres_db
+  ardm -- Connects to --> redis_server
+  prefect_api -- Connects to --> postgres_db
+  prefect_api -- Connects to --> redis_server
+  prefect_background -- Connects to --> postgres_db
+  prefect_background -- Connects to --> redis_server
+  prefect_migrate -- Connects to --> postgres_db
+  pgbackups -- Connects to --> postgres_db
+
+  classDef frontend fill:#e0f7fa,stroke:#00796b;
+  classDef backend fill:#f3e5f5,stroke:#6a1b9a;
+  class prefect_api,pgadmin,ardm frontend;
+  class postgres_db,redis_server,prefect_migrate,prefect_background,pgbackups backend;
+```
+
+---
+
 ## License
 MIT
