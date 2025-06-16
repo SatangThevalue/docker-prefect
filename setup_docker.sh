@@ -67,24 +67,3 @@ fi
 mkdir -p "$CERT_DIR"
 mkcert -cert-file "$CERT_DIR/fullchain.pem" -key-file "$CERT_DIR/privkey.pem" "$DOMAIN"
 echo "\nSSL certificate generated for domain: $DOMAIN (output in ./certs)"
-
-# Install No-IP Dynamic Update Client (DUC) 3.x
-if [ -f .env ]; then
-  export $(grep -v '^#' .env | xargs)
-fi
-
-if [[ -z "$NOIP_HOSTNAME" || -z "$NOIP_USERNAME" || -z "$NOIP_PASSWORD" ]]; then
-  echo "NOIP_HOSTNAME, NOIP_USERNAME, NOIP_PASSWORD must be set in .env for No-IP DUC setup. Skipping DUC install."
-else
-  echo "Installing No-IP Dynamic Update Client (DUC)..."
-  wget --content-disposition https://www.noip.com/download/linux/latest
-  tar xf noip-duc_*.tar.gz
-  DUC_DIR=$(find . -type d -name 'noip-duc_*' | head -n 1)
-  cd "$DUC_DIR/binaries"
-  sudo apt install -y ./noip-duc_*_amd64.deb
-  cd ../../
-  # Add crontab entry for DUC (every 5 minutes)
-  CRON_CMD="noip-duc -g $NOIP_HOSTNAME -u $NOIP_USERNAME -p $NOIP_PASSWORD"
-  (crontab -l 2>/dev/null | grep -v 'noip-duc'; echo "*/5 * * * * $CRON_CMD") | crontab -
-  echo "No-IP DUC installed and scheduled in crontab."
-fi

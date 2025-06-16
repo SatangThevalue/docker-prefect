@@ -1,0 +1,40 @@
+#!/bin/bash
+# Script to generate prometheus.yml from .env parameters for each job_name
+# Usage: bash prometheus.sh
+
+set -e
+
+# Load .env variables
+if [ -f .env ]; then
+  export $(grep -v '^#' .env | xargs)
+else
+  echo ".env file not found!"
+  exit 1
+fi
+
+cat > prometheus.yml <<EOF
+global:
+  scrape_interval: 10s
+
+scrape_configs:
+  - job_name: 'prefect-api'
+    static_configs:
+      - targets: ['${PREFECT_API_HOST:-prefect-api}:${PREFECT_API_PORT:-4200}']
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['${POSTGRES_HOST:-postgres-db}:${POSTGRES_PORT:-5432}']
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['${REDIS_HOST:-redis-server}:${REDIS_PORT:-6379}']
+  - job_name: 'redisinsight'
+    static_configs:
+      - targets: ['${RI_APP_HOST:-redisinsight}:${RI_APP_PORT:-5540}']
+  - job_name: 'pgadmin'
+    static_configs:
+      - targets: ['${PGADMIN_HOST:-pgadmin}:${PGADMIN_PORT:-80}']
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['${GRAFANA_HOST:-grafana}:${GRAFANA_PORT:-3000}']
+EOF
+
+echo "prometheus.yml generated successfully."
