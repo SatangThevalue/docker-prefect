@@ -323,3 +323,42 @@ MIT
 - https://grafana.com/docs/grafana/latest/
 - https://www.nginx.com/resources/wiki/
 - [Read this guide in Thai](./README.md)
+
+---
+
+## Server Setup Script (setup_docker.sh)
+
+This project includes a script for Ubuntu systems to install Docker, Docker Compose, and add the current user to the docker group for non-root usage.
+
+### Script Details
+- Updates and upgrades the system
+- Installs required packages and Docker’s official GPG key
+- Adds the Docker repository and installs Docker Engine, CLI, containerd, and Docker Compose plugin
+- Enables and starts the Docker service
+- Adds the current user to the docker group
+
+### Usage
+```sh
+sudo bash setup_docker.sh
+```
+After running, log out and log in again to use Docker without sudo.
+
+### System Requirements
+- Ubuntu 20.04 LTS or later (recommended)
+- 64-bit architecture
+- Internet connection
+
+### Recommended VM Specs
+| Cloud Provider    | vCPU | RAM  | Storage (SSD) | Example Instance Type         |
+|------------------|------|------|---------------|------------------------------|
+| AWS EC2          | 2+   | 4GB+ | 40GB+         | t3.medium, t3.large          |
+| Google Cloud     | 2+   | 4GB+ | 40GB+         | e2-standard-2, n2-standard-2 |
+| Microsoft Azure  | 2+   | 4GB+ | 40GB+         | Standard_B2s, D2s_v3         |
+
+- For production, 4 vCPU/8GB RAM or higher is recommended for high load or scaling.
+- All providers support Ubuntu images and Docker installation.
+
+### References
+- [AWS EC2 Instance Types](https://aws.amazon.com/ec2/instance-types/)
+- [Google Cloud Machine Types](https://cloud.google.com/compute/docs/general-purpose-machines)
+- [Azure VM Sizes](https://learn.microsoft.com/en-us/azure/virtual-machines/sizes)

@@ -330,16 +330,39 @@ url = "http://your-server-hostname-or-ip:4200/api"
 
 ---
 
-## แหล่งอ้างอิง
-- https://docs.prefect.io/latest/
-- https://github.com/PrefectHQ/prefect
-- https://hub.docker.com/r/prefecthq/prefect
-- https://hub.docker.com/_/postgres
-- https://hub.docker.com/_/redis
-- https://hub.docker.com/r/dpage/pgadmin4
-- https://hub.docker.com/r/qishibo/another-redis-desktop-manager
-- https://hub.docker.com/r/prom/prometheus
-- https://hub.docker.com/r/grafana/grafana
-- https://prometheus.io/docs/introduction/overview/
-- https://grafana.com/docs/grafana/latest/
-- https://www.nginx.com/resources/wiki/
+## สคริปต์ติดตั้งเซิร์ฟเวอร์ (setup_docker.sh)
+
+โปรเจคนี้มีสคริปต์สำหรับ Ubuntu เพื่อช่วยติดตั้ง Docker, Docker Compose และเพิ่มผู้ใช้เข้า group docker เพื่อใช้งานโดยไม่ต้องใช้ sudo
+
+### รายละเอียดสคริปต์
+- อัปเดตและอัปเกรดระบบ
+- ติดตั้งแพ็กเกจที่จำเป็นและ GPG key ของ Docker
+- เพิ่ม Docker repository และติดตั้ง Docker Engine, CLI, containerd, Docker Compose plugin
+- เปิดใช้งานและสตาร์ท Docker service
+- เพิ่มผู้ใช้ปัจจุบันเข้า group docker
+
+### วิธีใช้งาน
+```sh
+sudo bash setup_docker.sh
+```
+หลังจากรันแล้ว ให้ logout/login ใหม่เพื่อใช้งาน docker โดยไม่ต้องใช้ sudo
+
+### ข้อกำหนดระบบ (System Requirements)
+- Ubuntu 20.04 LTS ขึ้นไป (แนะนำ)
+- สถาปัตยกรรม 64-bit
+- อินเทอร์เน็ต
+
+### สเปค VM ที่แนะนำ
+| ผู้ให้บริการ Cloud | vCPU | RAM  | Storage (SSD) | ตัวอย่าง Instance Type         |
+|--------------------|------|------|---------------|-------------------------------|
+| AWS EC2            | 2+   | 4GB+ | 40GB+         | t3.medium, t3.large           |
+| Google Cloud       | 2+   | 4GB+ | 40GB+         | e2-standard-2, n2-standard-2  |
+| Microsoft Azure    | 2+   | 4GB+ | 40GB+         | Standard_B2s, D2s_v3          |
+
+- สำหรับ production แนะนำ 4 vCPU/8GB RAM ขึ้นไป หากต้องการรองรับโหลดสูงหรือ scale
+- ทุกผู้ให้บริการรองรับ Ubuntu และ Docker
+
+### แหล่งอ้างอิง
+- [AWS EC2 Instance Types](https://aws.amazon.com/ec2/instance-types/)
+- [Google Cloud Machine Types](https://cloud.google.com/compute/docs/general-purpose-machines)
+- [Azure VM Sizes](https://learn.microsoft.com/en-us/azure/virtual-machines/sizes)
